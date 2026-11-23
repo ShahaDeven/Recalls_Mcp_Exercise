@@ -16,8 +16,11 @@ def clamp_limit(limit: int | None) -> int:
 
 
 def fit(payload: dict, key: str = "results") -> dict:
-    """Trim the list under `key` until the serialized payload fits the size budget."""
+    """Trim the list under `key` until the serialized payload fits the size budget.
+
+    Always keeps at least one item, so a pager built on the trimmed length keeps moving.
+    """
     items = payload.get(key) or []
-    while items and len(json.dumps(payload, ensure_ascii=False)) > MAX_RESPONSE_CHARS:
+    while len(items) > 1 and len(json.dumps(payload, ensure_ascii=False)) > MAX_RESPONSE_CHARS:
         items.pop()
     return payload

@@ -19,7 +19,9 @@ mcp = FastMCP(
     instructions=(
         "Product recall lookups for the marketplace-safety team. Data comes from the US Consumer "
         "Product Safety Commission and is refreshed nightly. Use count_recalls for 'how many' "
-        "questions instead of paging search_recalls."
+        "questions instead of paging search_recalls. Use recalls_sold_at for 'what was sold at X' "
+        "(it matches only where the product was sold), and units_recalled for 'how many units' "
+        "questions, totals and the biggest recalls. Years are calendar years of the recall date."
     ),
 )
 
@@ -29,16 +31,49 @@ def search_recalls(query: str = "", year: int | None = None, limit: int = 20, cu
     """Search product recalls, newest first.
 
     `query` matches the recall title, product name, hazard and where the product was sold.
-    `year` limits results to recalls from that year. Returns `total` (all matches), up to
+    For "sold at <retailer>" questions use recalls_sold_at instead. `year` is the calendar year
+    the recall was announced. Returns `total` (all matches), up to
     `limit` results (max 50), and `next_cursor` when there are more: pass it back as `cursor`.
     """
     return tools.search_recalls(query, year, limit, cursor)
 
 
 @mcp.tool()
-def count_recalls(query: str = "", year: int | None = None) -> dict:
-    """Count recalls matching `query` and/or `year`. Same matching rules as search_recalls."""
-    return tools.count_recalls(query, year)
+def count_recalls(query: str = "", year: int | None = None, retailer: str | None = None) -> dict:
+    """Count recalls matching `query`, `year` (calendar year) and/or `retailer`.
+
+    `query` follows search_recalls. `retailer` matches only where the product was sold, with the
+    same spellings as recalls_sold_at.
+    """
+    return tools.count_recalls(query, year, retailer)
+
+
+@mcp.tool()
+def recalls_sold_at(
+    retailer: str, year: int | None = None, days: int | None = None, limit: int = 20, cursor: int = 0
+) -> dict:
+    """List recalls of products sold at a retailer, newest first.
+
+    Matches only the "sold at" field, not titles or hazards, and covers the usual spellings
+    (for example Walmart, Wal-Mart and walmart.com; Amazon and Amazon.com). Optional `year`
+    (calendar year of the recall) and `days` (announced in the last N days). Returns `total`
+    (all matches), up to `limit` results (max 50) and `next_cursor` when there are more.
+    """
+    return tools.recalls_sold_at(retailer, year, days, limit, cursor)
+
+
+@mcp.tool()
+def units_recalled(
+    year: int | None = None, retailer: str | None = None, days: int | None = None, top: int = 5
+) -> dict:
+    """Total units recalled, and the recalls that covered the most units.
+
+    Filter by `year` (calendar year of the recall), `retailer` (where it was sold, same matching
+    as recalls_sold_at) and/or `days` (announced in the last N days). Returns the number of
+    recalls, `total_units`, and the `top` recalls by units (max 20). Read `caveat` before
+    quoting a total.
+    """
+    return tools.units_recalled(year, retailer, days, top)
 
 
 @mcp.tool()
@@ -58,7 +93,10 @@ def recent_recalls(days: int = 30) -> dict:
 
 @mcp.tool()
 def add_note(recall_number: str, note: str, author: str = "agent") -> dict:
-    """Attach a short note to a recall so teammates and their agents can see it on get_recall."""
+    """Attach a short note to a recall so teammates and their agents can see it on get_recall.
+
+    Accepts the number with or without the dash. Fails if no recall has that number.
+    """
     return tools.add_note(recall_number, note, author)
 
 
