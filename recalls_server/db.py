@@ -214,12 +214,22 @@ def add_note(recall_number: str, body: str, author: str) -> dict:
     return {"id": note_id, "recall_number": number, "author": author, "created_at": created}
 
 
+def newest_recall_date() -> str | None:
+    with connect() as con:
+        return con.execute("SELECT MAX(recall_date) FROM recalls").fetchone()[0]
+
+
 def status() -> dict:
     with connect() as con:
         rows = con.execute("SELECT COUNT(*) FROM recalls").fetchone()[0]
-        last = con.execute("SELECT run_at, status FROM load_log ORDER BY run_at DESC LIMIT 1").fetchone()
+        newest = con.execute("SELECT MAX(recall_date) FROM recalls").fetchone()[0]
+        last = con.execute(
+            "SELECT run_at, status, rows_upserted FROM load_log ORDER BY run_at DESC LIMIT 1"
+        ).fetchone()
     return {
         "recalls_loaded": rows,
+        "newest_recall_date": newest,
         "last_load_at": last["run_at"] if last else None,
         "last_load_status": last["status"] if last else "never",
+        "last_load_rows_upserted": last["rows_upserted"] if last else None,
     }

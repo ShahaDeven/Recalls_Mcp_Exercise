@@ -21,7 +21,8 @@ mcp = FastMCP(
         "Product Safety Commission and is refreshed nightly. Use count_recalls for 'how many' "
         "questions instead of paging search_recalls. Use recalls_sold_at for 'what was sold at X' "
         "(it matches only where the product was sold), and units_recalled for 'how many units' "
-        "questions, totals and the biggest recalls. Years are calendar years of the recall date."
+        "questions, totals and the biggest recalls. Years are calendar years of the recall date. "
+        "Call server_status first in a session and pass on any warnings about stale data."
     ),
 )
 
@@ -86,9 +87,14 @@ def get_recall(recall_number: str) -> dict:
 
 
 @mcp.tool()
-def recent_recalls(days: int = 30) -> dict:
-    """List recalls announced in the last `days` days (default 30), newest first."""
-    return tools.recent_recalls(days)
+def recent_recalls(days: int = 30, limit: int = 50, cursor: int = 0) -> dict:
+    """List recalls announced in the last `days` days (default 30, max 365), newest first.
+
+    Returns `total` (all recalls in the window), `returned` (on this page), `next_cursor` when
+    there are more, and `data_through` (the newest recall date loaded). If `data_through` is well
+    before today, recent recalls are missing: say so. For "sold at X" use recalls_sold_at with `days`.
+    """
+    return tools.recent_recalls(days, limit, cursor)
 
 
 @mcp.tool()
@@ -102,7 +108,11 @@ def add_note(recall_number: str, note: str, author: str = "agent") -> dict:
 
 @mcp.tool()
 def server_status() -> dict:
-    """Report how many recalls are loaded and when the nightly load last ran."""
+    """Report how many recalls are loaded, how fresh the data is, and when the nightly load last ran.
+
+    Check `data_fresh` and `warnings` before answering questions about recent recalls or totals,
+    and pass any warnings on to the user.
+    """
     return tools.server_status()
 
 
