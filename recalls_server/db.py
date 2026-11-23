@@ -222,13 +222,14 @@ def newest_recall_date() -> str | None:
 def status() -> dict:
     with connect() as con:
         rows = con.execute("SELECT COUNT(*) FROM recalls").fetchone()[0]
-        newest = con.execute("SELECT MAX(recall_date) FROM recalls").fetchone()[0]
+        earliest, latest = con.execute("SELECT MIN(recall_date), MAX(recall_date) FROM recalls").fetchone()
         last = con.execute(
             "SELECT run_at, status, rows_upserted FROM load_log ORDER BY run_at DESC LIMIT 1"
         ).fetchone()
     return {
         "recalls_loaded": rows,
-        "newest_recall_date": newest,
+        "earliest_recall_date": earliest,
+        "latest_recall_date": latest,
         "last_load_at": last["run_at"] if last else None,
         "last_load_status": last["status"] if last else "never",
         "last_load_rows_upserted": last["rows_upserted"] if last else None,

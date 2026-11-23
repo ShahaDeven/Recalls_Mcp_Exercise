@@ -22,6 +22,32 @@ STALE_AFTER_DAYS = 10
 # The loader runs nightly; allow for a late or slow run before calling the load overdue.
 LOAD_OVERDUE_HOURS = 36
 
+# Problems in the snapshot that the nightly loader (in the data-platform repo) introduces. Found by
+# comparing data/recalls.db with the live CPSC feed on 2026-11-23. Remove an entry once the loader
+# is fixed and a reload confirms it.
+KNOWN_DATA_ISSUES = [
+    {
+        "issue": "Recalls whose unit count is written in millions (for example 'About 21 million') are "
+                 "missing from the database.",
+        "example": "24281 (MGA Miniverse, about 21 million units) is not loaded.",
+        "effect": "Counts and unit totals for every period are too low, and 'largest recall' answers "
+                  "can be wrong. Treat them as lower bounds.",
+    },
+    {
+        "issue": "Some 'sold at' text is cut off, usually at '... and online at', so retailers named "
+                 "after that point are lost.",
+        "example": "25392 is stored as 'Bikes with the recalled batteries were sold'; CPSC lists "
+                   "amazon.com and walmart.com after that.",
+        "effect": "Retailer lookups (recalls_sold_at, retailer filters) miss recalls. Treat them as "
+                  "lower bounds.",
+    },
+    {
+        "issue": "Some unit counts are misparsed from the CPSC wording.",
+        "example": "24018: 'About 17, 370' is stored as 17 units.",
+        "effect": "Unit totals can be off. Check units_text for any recall you single out.",
+    },
+]
+
 
 def _paged(total: int, rows: list[dict], cursor: int, extra: dict | None = None) -> dict:
     """Build a page and set next_cursor from the rows actually returned after trimming."""
@@ -130,7 +156,7 @@ def server_status(now: dt.datetime | None = None) -> dict:
     status = db.status()
     warnings: list[str] = []
 
-    newest = status["newest_recall_date"]
+    newest = status["latest_recall_date"]
     days_since_newest = (now.date() - dt.date.fromisoformat(newest)).days if newest else None
     if days_since_newest is None:
         warnings.append("No recalls are loaded.")
@@ -152,11 +178,21 @@ def server_status(now: dt.datetime | None = None) -> dict:
     if status["last_load_status"] == "ok" and days_since_newest is not None and days_since_newest > STALE_AFTER_DAYS:
         warnings.append("The loader reports 'ok', but no new recalls have arrived, so its status can't be trusted.")
 
+    issues = list(KNOWN_DATA_ISSUES)
+    if newest:
+        issues.append({
+            "issue": f"Data ends {newest}.",
+            "example": f"No recall announced after {newest} is loaded.",
+            "effect": "Questions about recent recalls, or about periods that run past that date, "
+                      "are incomplete.",
+        })
+
     return {
         **status,
         "days_since_newest_recall": days_since_newest,
         "hours_since_last_load": hours_since_load,
         "data_fresh": not warnings,
         "warnings": warnings,
+        "known_data_issues": issues,
         "source": SOURCE,
     }

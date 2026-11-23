@@ -22,7 +22,7 @@ mcp = FastMCP(
         "questions instead of paging search_recalls. Use recalls_sold_at for 'what was sold at X' "
         "(it matches only where the product was sold), and units_recalled for 'how many units' "
         "questions, totals and the biggest recalls. Years are calendar years of the recall date. "
-        "Call server_status first in a session and pass on any warnings about stale data."
+        "Call server_status first and mention any known_data_issues that affect the answer."
     ),
 )
 
@@ -110,8 +110,9 @@ def add_note(recall_number: str, note: str, author: str = "agent") -> dict:
 def server_status() -> dict:
     """Report how many recalls are loaded, how fresh the data is, and when the nightly load last ran.
 
-    Check `data_fresh` and `warnings` before answering questions about recent recalls or totals,
-    and pass any warnings on to the user.
+    Also returns `earliest_recall_date`, `latest_recall_date` and `known_data_issues`: problems in
+    the loaded data that make some counts, unit totals and retailer lookups lower bounds. Check
+    `warnings` and `known_data_issues` before answering, and mention the ones that affect the answer.
     """
     return tools.server_status()
 

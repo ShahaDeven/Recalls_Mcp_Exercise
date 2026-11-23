@@ -34,7 +34,8 @@ class Tier2Tests(unittest.TestCase):
 
     def test_status_fresh_right_after_load(self):
         out = tools.server_status(now=dt.datetime(2026, 3, 25, 12, 0, tzinfo=UTC))
-        self.assertEqual(out["newest_recall_date"], "2026-03-20")
+        self.assertEqual(out["earliest_recall_date"], "2025-03-01")
+        self.assertEqual(out["latest_recall_date"], "2026-03-20")
         self.assertEqual(out["days_since_newest_recall"], 5)
         self.assertTrue(out["data_fresh"])
         self.assertEqual(out["warnings"], [])
@@ -63,6 +64,14 @@ class Tier2Tests(unittest.TestCase):
             con.execute("DELETE FROM load_log WHERE run_at = '2026-03-26T02:00:07Z'")
             con.commit()
             con.close()
+
+    def test_status_lists_known_data_issues(self):
+        issues = tools.server_status(now=dt.datetime(2026, 3, 25, 12, 0, tzinfo=UTC))["known_data_issues"]
+        text = " ".join(i["issue"] + " " + i["example"] for i in issues)
+        for expected in ("millions", "24281", "cut off", "25392", "24018", "Data ends 2026-03-20."):
+            self.assertIn(expected, text)
+        for issue in issues:
+            self.assertEqual(set(issue), {"issue", "example", "effect"})
 
     # recent_recalls totals ---------------------------------------------------------------
 
